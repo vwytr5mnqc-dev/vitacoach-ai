@@ -7,16 +7,28 @@ export class AppController {
 
   // Coaches
   @Post('coaches')
-  createCoach(@Body() body: { email: string; orgName: string }) { return this.appService.createCoach(body); }
+  createCoach(@Body() body: { email: string; orgName: string }) {
+    return this.appService.createCoach(body);
+  }
   
-  // Clients
+  @Get('coaches')
+  getCoaches() {
+    return this.appService.getCoaches();
+  }
+
+  // Clients (AQUI ESTABA EL ERROR)
+  // Ahora usamos 'any' para aceptar edad, peso, lesiones, etc. sin problemas
   @Post('clients')
-  createClient(@Body() body: { coachId: string; name: string; email: string; goal: string }) { return this.appService.createClient(body); }
+  createClient(@Body() body: any) { 
+    return this.appService.createClient(body); 
+  }
 
   @Get('clients/:coachId')
-  getClients(@Param('coachId') coachId: string) { return this.appService.getClientsByCoach(coachId); }
+  getClients(@Param('coachId') coachId: string) {
+    return this.appService.getClientsByCoach(coachId); 
+  }
 
-  // NUEVO: Generar Plan ⚡️
+  // Generar Plan IA
   @Post('plans/generate')
   generatePlan(@Body() body: { clientId: string; weeks: number; focus: string }) {
     return this.appService.generatePlan(body);

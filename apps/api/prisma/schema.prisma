@@ -8,34 +8,42 @@ datasource db {
 }
 
 // ==========================================
-// 1. ENTIDAD: COACH (El dueño de la cuenta)
+// 1. ENTIDAD: COACH
 // ==========================================
 model Coach {
-  id           String   @id @default(uuid()) // Usamos UUID para seguridad pro
+  id           String   @id @default(uuid())
   email        String   @unique
-  password     String   // Aquí guardaremos el hash
+  password     String
   orgName      String?
-  planType     String   @default("free") // free, pro, enterprise
+  planType     String   @default("free")
   createdAt    DateTime @default(now())
   
-  // Relación: Un coach tiene muchos clientes
   clients      Client[]
 }
 
 // ==========================================
-// 2. ENTIDAD: CLIENT (El deportista)
+// 2. ENTIDAD: CLIENT (Con Riesgo y Readiness)
 // ==========================================
 model Client {
   id             String   @id @default(uuid())
   coachId        String
   name           String
   email          String?
-  dob            DateTime?
-  sex            String?
-  goal           String?  // hypertrophy, strength, weight_loss
-  equipment      String[] // array de strings: [barbell, dumbbell]
-  injuries       Json?    // Guardamos las lesiones como objeto JSON
-  baselineMetrics Json?   // Métricas iniciales
+  goal           String
+  
+  // Biometría
+  age            Int      @default(25)
+  weight         Float    @default(70)
+  height         Int      @default(170)
+  gender         String   @default("male")
+  activityLevel  String   @default("active")
+  injuries       String?
+  equipment      String   @default("full_gym")
+
+  // --- NUEVOS CAMPOS RADAR 📡 ---
+  riskScore      Int      @default(0)       // 0-100 (Probabilidad de Churn)
+  readiness      String   @default("High")  // High, Medium, Low
+
   createdAt      DateTime @default(now())
 
   // Relaciones
@@ -45,16 +53,15 @@ model Client {
 }
 
 // ==========================================
-// 3. ENTIDAD: PLAN (Entrenamiento)
+// 3. ENTIDAD: PLAN (Mesociclos)
 // ==========================================
 model Plan {
   id             String   @id @default(uuid())
   clientId       String
   weeks          Int
   focus          String
-  status         String   @default("draft") // draft, approved, active
-  blocks         Json     // Aquí la IA guardará la estructura completa del entreno
-  createdReasoning Json?  // Explicabilidad de la IA (XAI)
+  status         String   @default("draft")
+  blocks         Json     // Estructura compleja del plan
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -62,14 +69,14 @@ model Plan {
 }
 
 // ==========================================
-// 4. ENTIDAD: METRIC LOG (Readiness & Churn)
+// 4. ENTIDAD: METRIC LOG
 // ==========================================
 model MetricLog {
   id             String   @id @default(uuid())
   clientId       String
   date           DateTime @default(now())
   sleepHours     Float?
-  soreness       Int?     // 1-10
+  soreness       Int?
   hrv            Int?
   restingHr      Int?
   
