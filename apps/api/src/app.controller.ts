@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Delete, Param } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -10,8 +10,13 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Post() // <--- Esta es la ventanilla para CREAR
+  @Post()
   createUser(@Body() body: { email: string; name: string }) {
     return this.appService.createUser(body);
+  }
+
+  @Delete(':id')
+  deleteUser(@Param('id') id: string) {
+    return this.appService.deleteUser(Number(id));
   }
 }
