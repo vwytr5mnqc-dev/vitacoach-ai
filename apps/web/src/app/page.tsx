@@ -1,122 +1,268 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-interface User {
-  id: number;
-  email: string;
+// --- TIPOS DE DATOS (El Modelo B2B) ---
+interface Plan {
+  id: string;
+  status: string;
+  weeks: number;
+  focus: string;
+  // La estructura que nos da la IA
+  blocks: {
+    training: { day: string; focus: string; exercises: string[] }[];
+    nutrition: { calories: number; macros: string; example_meal: string };
+    reasoning: string;
+  };
+}
+
+interface Client {
+  id: string;
   name: string;
-  diet?: string;
+  email: string;
+  goal: string;
+  plans?: Plan[];
+}
+
+interface Coach {
+  id: string;
+  email: string;
+  orgName: string;
 }
 
 export default function Home() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  // --- ESTADOS ---
+  const [coach, setCoach] = useState<Coach | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [view, setView] = useState<'register' | 'dashboard'>('register');
+  
+  // Selección
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [generatedPlan, setGeneratedPlan] = useState<Plan | null>(null);
+
+  // Formularios
+  const [orgName, setOrgName] = useState('');
+  const [coachEmail, setCoachEmail] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientGoal, setClientGoal] = useState('Hipertrofia');
+  
   const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    fetch('http://localhost:3000')
-      .then((res) => res.json())
-      .then((data) => setUsers(data));
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // --- 1. REGISTRO DE COACH ---
+  const handleRegisterCoach = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    const response = await fetch('http://localhost:3000', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email }),
-    });
-
-    const newUser = await response.json();
-    setUsers([newUser, ...users]);
-    setName('');
-    setEmail('');
+    try {
+      const res = await fetch('http://localhost:3000/coaches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: coachEmail, orgName }),
+      });
+      if (res.ok) {
+        const newCoach = await res.json();
+        setCoach(newCoach);
+        setView('dashboard');
+      }
+    } catch (err) { alert("Error al conectar API"); }
     setLoading(false);
   };
 
-  // Función Nueva: BORRAR 🗑️
-  const handleDelete = async (id: number) => {
-    if(!confirm("¿Seguro que quieres borrar este usuario?")) return;
-
-    await fetch(`http://localhost:3000/${id}`, {
-      method: 'DELETE',
+  // --- 2. CREAR CLIENTE ---
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!coach) return;
+    setLoading(true);
+    const res = await fetch('http://localhost:3000/clients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coachId: coach.id, name: clientName, email: clientEmail, goal: clientGoal }),
     });
-
-    // Actualizamos la lista quitando al borrado
-    setUsers(users.filter(user => user.id !== id));
+    const newClient = await res.json();
+    setClients([newClient, ...clients]);
+    setClientName(''); setClientEmail('');
+    setLoading(false);
   };
 
+  // --- 3. GENERAR PLAN CON IA 🧠 ---
+  const handleGeneratePlan = async () => {
+    if (!selectedClient) return;
+    setGenerating(true);
+    
+    try {
+      const res = await fetch('http://localhost:3000/plans/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: selectedClient.id,
+          weeks: 4,
+          focus: selectedClient.goal
+        }),
+      });
+      const newPlan = await res.json();
+      setGeneratedPlan(newPlan); // Mostramos el plan recién horneado
+    } catch (error) {
+      console.error(error);
+      alert("Error generando plan. Revisa que OpenAI tenga créditos.");
+    }
+    setGenerating(false);
+  };
+
+  // --- RENDERIZADO ---
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        
-        <div className="text-center">
-          <h1 className="text-4xl font-extrabold text-blue-600 tracking-tight">
-            VitaCoach AI
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Tu nutriólogo personal con Inteligencia Artificial
-          </p>
-        </div>
-
-        {/* --- FORMULARIO --- */}
-        <div className="bg-white py-8 px-4 shadow-xl rounded-2xl sm:px-10 border border-gray-100">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre</label>
-              <input id="name" type="text" required value={name} onChange={(e) => setName(e.target.value)}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Ej. Dwayne Johnson" />
-            </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-              <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="therock@email.com" />
-            </div>
-            <button type="submit" disabled={loading}
-              className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white transition duration-150 ease-in-out
-                ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {loading ? '🤖 Generando dieta con IA...' : 'Registrar y Generar Dieta'}
-            </button>
-          </form>
-        </div>
-
-        {/* --- LISTA CON DIETAS Y BOTÓN BORRAR --- */}
-        <div className="bg-white shadow overflow-hidden rounded-xl border border-gray-100">
-           <div className="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-100">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Usuarios & Dietas</h3>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      
+      {/* VISTA REGISTRO */}
+      {view === 'register' && (
+        <div className="flex min-h-screen items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-slate-200">
+            <h1 className="text-3xl font-bold text-blue-600 text-center mb-2">VitaCoach AI</h1>
+            <p className="text-center text-slate-500 mb-8">Software para Entrenadores</p>
+            <form onSubmit={handleRegisterCoach} className="space-y-4">
+              <input className="w-full p-3 border rounded-lg" placeholder="Nombre Organización (Ej. Cobra Kai)" value={orgName} onChange={e => setOrgName(e.target.value)} required />
+              <input className="w-full p-3 border rounded-lg" placeholder="Tu Email" value={coachEmail} onChange={e => setCoachEmail(e.target.value)} required />
+              <button disabled={loading} className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+                {loading ? 'Entrando...' : 'Iniciar como Coach'}
+              </button>
+            </form>
           </div>
-          <ul className="divide-y divide-gray-200">
-            {users.map((user) => (
-              <li key={user.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50 transition group">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold text-blue-600">{user.name}</p>
-                  
-                  {/* Botón Borrar (Solo aparece al pasar el mouse o siempre en móvil) */}
+        </div>
+      )}
+
+      {/* VISTA DASHBOARD */}
+      {view === 'dashboard' && coach && (
+        <div className="flex h-screen overflow-hidden">
+          
+          {/* BARRA LATERAL (CLIENTES) */}
+          <div className="w-80 bg-white border-r border-slate-200 flex flex-col">
+            <div className="p-4 border-b border-slate-100">
+              <h2 className="font-bold text-lg text-slate-800">{coach.orgName}</h2>
+              <p className="text-xs text-slate-500">Coach: {coach.email}</p>
+            </div>
+            
+            {/* Formulario Rápido Cliente */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200">
+              <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Nuevo Atleta</h3>
+              <form onSubmit={handleCreateClient} className="space-y-2">
+                <input className="w-full text-sm p-2 border rounded" placeholder="Nombre" value={clientName} onChange={e => setClientName(e.target.value)} />
+                <input className="w-full text-sm p-2 border rounded" placeholder="Email" value={clientEmail} onChange={e => setClientEmail(e.target.value)} />
+                <select className="w-full text-sm p-2 border rounded bg-white" value={clientGoal} onChange={e => setClientGoal(e.target.value)}>
+                  <option>Hipertrofia</option>
+                  <option>Fuerza</option>
+                  <option>Pérdida de Peso</option>
+                </select>
+                <button disabled={loading} className="w-full bg-slate-800 text-white text-xs py-2 rounded hover:bg-slate-900">
+                  {loading ? '...' : '+ Agregar'}
+                </button>
+              </form>
+            </div>
+
+            {/* Lista Scrollable */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {clients.map(c => (
+                <div key={c.id} onClick={() => { setSelectedClient(c); setGeneratedPlan(null); }}
+                  className={`p-3 rounded-lg cursor-pointer transition ${selectedClient?.id === c.id ? 'bg-blue-50 border-blue-200 border' : 'hover:bg-slate-50'}`}>
+                  <p className="font-medium text-sm text-slate-800">{c.name}</p>
+                  <p className="text-xs text-slate-500">{c.goal}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* AREA PRINCIPAL (DETALLE Y PLAN) */}
+          <div className="flex-1 overflow-y-auto bg-slate-50 p-8">
+            {!selectedClient ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                <p className="text-6xl mb-4">👈</p>
+                <p>Selecciona un atleta del menú para gestionar su plan.</p>
+              </div>
+            ) : (
+              <div className="max-w-4xl mx-auto">
+                {/* Header Cliente */}
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h1 className="text-3xl font-bold text-slate-900">{selectedClient.name}</h1>
+                    <p className="text-slate-500">Objetivo: <span className="font-medium text-blue-600">{selectedClient.goal}</span></p>
+                  </div>
                   <button 
-                    onClick={() => handleDelete(user.id)}
-                    className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition"
-                    title="Borrar usuario"
+                    onClick={handleGeneratePlan} 
+                    disabled={generating}
+                    className={`px-6 py-3 rounded-lg font-bold text-white shadow-lg transition transform hover:scale-105 ${generating ? 'bg-blue-400' : 'bg-gradient-to-r from-blue-600 to-indigo-600'}`}
                   >
-                    🗑️
+                    {generating ? '✨ La IA está pensando...' : '⚡️ Generar Plan IA'}
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 mb-2">{user.email}</p>
-                
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm text-gray-700 border border-blue-100">
-                  <span className="font-semibold text-blue-800">🍎 Dieta Sugerida:</span>
-                  <p className="mt-1 italic">{user.diet || "Generando..."}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
 
-      </div>
+                {/* VISUALIZADOR DEL PLAN */}
+                {generatedPlan ? (
+                  <div className="space-y-6 animate-fade-in">
+                    
+                    {/* Tarjeta de Resumen */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                      <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">Análisis de la IA</h3>
+                      <p className="text-slate-700 italic">"{generatedPlan.blocks.reasoning}"</p>
+                    </div>
+
+                    {/* Grid: Entreno + Dieta */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                      
+                      {/* Entreno */}
+                      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="bg-slate-800 p-4 text-white">
+                          <h3 className="font-bold">🏋️‍♂️ Rutina de Entrenamiento</h3>
+                          <p className="text-xs text-slate-300">Semana 1-4</p>
+                        </div>
+                        <div className="p-4 space-y-4">
+                          {generatedPlan.blocks.training.map((day, idx) => (
+                            <div key={idx} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0">
+                              <p className="font-bold text-blue-600 text-sm">{day.day}: {day.focus}</p>
+                              <ul className="mt-1 space-y-1">
+                                {day.exercises.map((ex, i) => (
+                                  <li key={i} className="text-sm text-slate-600">• {ex}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Dieta */}
+                      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="bg-green-600 p-4 text-white">
+                          <h3 className="font-bold">🥦 Plan Nutricional</h3>
+                          <p className="text-xs text-green-100">Objetivo Diario</p>
+                        </div>
+                        <div className="p-6 text-center space-y-6">
+                          <div>
+                            <p className="text-sm text-slate-400 uppercase">Calorías Diarias</p>
+                            <p className="text-4xl font-extrabold text-slate-800">{generatedPlan.blocks.nutrition.calories}</p>
+                          </div>
+                          <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+                            <p className="text-sm font-bold text-green-800">Macros</p>
+                            <p className="text-sm text-green-700">{generatedPlan.blocks.nutrition.macros}</p>
+                          </div>
+                          <div className="text-left">
+                            <p className="text-xs text-slate-400 uppercase mb-1">Ejemplo de Comida</p>
+                            <p className="text-sm text-slate-700 font-medium">🍽 {generatedPlan.blocks.nutrition.example_meal}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                ) : (
+                  // Estado vacío
+                  <div className="bg-white border-2 border-dashed border-slate-200 rounded-xl p-12 text-center">
+                    <p className="text-slate-400 text-lg">Este atleta no tiene un plan activo.</p>
+                    <p className="text-slate-400 text-sm mt-2">Haz clic en "Generar Plan" para crear uno.</p>
+                  </div>
+                )}
+
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

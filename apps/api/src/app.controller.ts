@@ -1,22 +1,24 @@
-import { Body, Controller, Get, Post, Delete, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Param } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @Get()
-  getHello() {
-    return this.appService.getHello();
-  }
+  // Coaches
+  @Post('coaches')
+  createCoach(@Body() body: { email: string; orgName: string }) { return this.appService.createCoach(body); }
+  
+  // Clients
+  @Post('clients')
+  createClient(@Body() body: { coachId: string; name: string; email: string; goal: string }) { return this.appService.createClient(body); }
 
-  @Post()
-  createUser(@Body() body: { email: string; name: string }) {
-    return this.appService.createUser(body);
-  }
+  @Get('clients/:coachId')
+  getClients(@Param('coachId') coachId: string) { return this.appService.getClientsByCoach(coachId); }
 
-  @Delete(':id')
-  deleteUser(@Param('id') id: string) {
-    return this.appService.deleteUser(Number(id));
+  // NUEVO: Generar Plan ⚡️
+  @Post('plans/generate')
+  generatePlan(@Body() body: { clientId: string; weeks: number; focus: string }) {
+    return this.appService.generatePlan(body);
   }
 }

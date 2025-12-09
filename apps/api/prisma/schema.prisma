@@ -7,9 +7,71 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  diet  String? // <--- ¡AGREGA ESTA LÍNEA! (El ? significa que puede estar vacío)
+// ==========================================
+// 1. ENTIDAD: COACH (El dueño de la cuenta)
+// ==========================================
+model Coach {
+  id           String   @id @default(uuid()) // Usamos UUID para seguridad pro
+  email        String   @unique
+  password     String   // Aquí guardaremos el hash
+  orgName      String?
+  planType     String   @default("free") // free, pro, enterprise
+  createdAt    DateTime @default(now())
+  
+  // Relación: Un coach tiene muchos clientes
+  clients      Client[]
+}
+
+// ==========================================
+// 2. ENTIDAD: CLIENT (El deportista)
+// ==========================================
+model Client {
+  id             String   @id @default(uuid())
+  coachId        String
+  name           String
+  email          String?
+  dob            DateTime?
+  sex            String?
+  goal           String?  // hypertrophy, strength, weight_loss
+  equipment      String[] // array de strings: [barbell, dumbbell]
+  injuries       Json?    // Guardamos las lesiones como objeto JSON
+  baselineMetrics Json?   // Métricas iniciales
+  createdAt      DateTime @default(now())
+
+  // Relaciones
+  coach          Coach    @relation(fields: [coachId], references: [id])
+  plans          Plan[]
+  metricLogs     MetricLog[]
+}
+
+// ==========================================
+// 3. ENTIDAD: PLAN (Entrenamiento)
+// ==========================================
+model Plan {
+  id             String   @id @default(uuid())
+  clientId       String
+  weeks          Int
+  focus          String
+  status         String   @default("draft") // draft, approved, active
+  blocks         Json     // Aquí la IA guardará la estructura completa del entreno
+  createdReasoning Json?  // Explicabilidad de la IA (XAI)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  client         Client   @relation(fields: [clientId], references: [id])
+}
+
+// ==========================================
+// 4. ENTIDAD: METRIC LOG (Readiness & Churn)
+// ==========================================
+model MetricLog {
+  id             String   @id @default(uuid())
+  clientId       String
+  date           DateTime @default(now())
+  sleepHours     Float?
+  soreness       Int?     // 1-10
+  hrv            Int?
+  restingHr      Int?
+  
+  client         Client   @relation(fields: [clientId], references: [id])
 }
